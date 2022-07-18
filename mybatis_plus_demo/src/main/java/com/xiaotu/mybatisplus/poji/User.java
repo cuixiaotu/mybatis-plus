@@ -13,7 +13,7 @@ import lombok.RequiredArgsConstructor;
 public class User {
     //@TableId(value = "id",type = IdType.AUTO)
     private Long id;
-    //@TableField("username")
+    @TableField("username")
     private String name;
     private Integer age;
     private String email;
