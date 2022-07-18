@@ -182,10 +182,28 @@ public interface UserMapper extends BaseMapper<User> {
 
 - 测试
 
+```java
+@SpringBootTest
+public class MybatisPlusTest {
+    @Autowired
+    private UserMapper userMapper;
+
+    @Test
+    public void testSelectList(){
+        userMapper.selectList(null).forEach(System.out::println);
+    }
+
+}
 ```
 
+- 添加日志
 
+在application.yml中
 
+```
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 ```
 
 
