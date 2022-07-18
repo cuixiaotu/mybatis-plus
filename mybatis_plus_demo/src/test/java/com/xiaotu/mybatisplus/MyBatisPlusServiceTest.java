@@ -32,4 +32,14 @@ public class MyBatisPlusServiceTest {
         }
         userService.saveBatch(users);
     }
+
+    @Test
+    public void testSaveSingle(){
+        User user = new User();
+        user.setName("abc");
+        user.setAge(20);
+        userService.save(user);
+    }
+
+
 }

@@ -38,7 +38,7 @@ public class MybatisPlusTest {
 
     @Test
     public void testDeleteByIds(){
-        List<Long> idList = Arrays.asList(1L,2L,3L);
+        List<Long> idList = Arrays.asList(4L,5L);
         int result = userMapper.deleteBatchIds(idList);
         System.out.println("受影响的行数："+result );
     }

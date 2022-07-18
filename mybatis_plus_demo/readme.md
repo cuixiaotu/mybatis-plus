@@ -517,3 +517,131 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
 ```
 
+
+
+# 四、常用注解
+
+##  1、@TableName
+
+> 经过以上的测试，在使用MyBatis-Plus实现基本的CRUD时，我们并没有指定要操作的表，只是在
+> Mapper接口继承BaseMapper时，设置了泛型User，而操作的表为user表
+> 由此得出结论，MyBatis-Plus在确定操作的表时，由BaseMapper的泛型决定，即实体类型决
+> 定，且默认操作的表名和实体类型的类名一致
+
+- 若泛型User和实际表名不一致会出现，table  xxx dont exists的报错。
+- 在实体类上加上@TableName("t_user")可解决
+- 通过全局配置
+
+```yaml
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+#设置MyBatis-Plus的全局配置
+  global-config:
+    db-config:
+      #设置实体类所对应的表的统一前缀
+      table-prefix: t_
+```
+
+
+
+## 2、@TableId
+
+> 经过以上的测试，MyBatis-Plus在实现CRUD时，会默认将id作为主键列，并在插入数据时，默认
+> 基于雪花算法的策略生成id
+
+- 问题
+
+> 若实体类和表中表示主键的不是id，而是其他字段，例如uid，MyBatis-Plus会自动识别uid为主
+> 键列吗？
+
+- 通过@TableId解决问题
+
+在实体类中uid属性上通过@TableId将其标识为主键，即可成功执行SQL语句
+
+- @TableId的value属性
+
+若实体类中主键对应的属性为id，而表中表示主键的字段为uid，此时若只在属性id上添加注解
+@TableId，则抛出异常Unknown column 'id' in 'field list'，即MyBatis-Plus仍然会将id作为表的
+主键操作，而表中表示主键的是字段uid
+此时需要通过@TableId注解的value属性，指定表中的主键字段，@TableId("uid")或
+@TableId(value="uid")
+
+- @TableId的type属性
+
+常用的主键策略(源码里还有其他几种类型 可以详细看)
+
+| 值                     | 描述                                                         |
+| ---------------------- | ------------------------------------------------------------ |
+| IdType.ASSIGN_ID(默认) | 基于雪花算法的策略生成数据id，与数据库id是否设置自增无关     |
+| IdType.AUTO            | 使用数据库的自增策略，注意，该类型请确保数据库设置了id自增，否则无效 |
+
+
+
+- 雪花算法
+
+  背景：为了应对数据规模的增长，以应对逐渐增长的访问压力和数据量。
+  数据库的扩展方式主要包括：业务分库、主从复制，数据库分表
+
+  	 
+
+雪花算法是由Twitter公布的分布式主键生成算法，它能够保证不同表的主键的不重复性，以及相同表的
+主键的有序性。
+①核心思想：
+长度共64bit（一个long型）。
+首先是一个符号位，1bit标识，由于long基本类型在Java中是带符号的，最高位是符号位，正数是0，负
+数是1，所以id一般是正数，最高位是0。
+41bit时间截(毫秒级)，存储的是时间截的差值（当前时间截 - 开始时间截)，结果约等于69.73年。
+10bit作为机器的ID（5个bit是数据中心，5个bit的机器ID，可以部署在1024个节点）。
+12bit作为毫秒内的流水号（意味着每个节点在每毫秒可以产生 4096 个 ID）
+
+![image-20220718143143767](images/readme/image-20220718143143767.png)
+
+②优点：整体上按照时间自增排序，并且整个分布式系统内不会产生ID碰撞，并且效率较高。
+
+## 3、@TableField
+
+>MyBatis-Plus在执行SQL语句时，要保证实体类中的属性名和表中的字段名一致
+>如果实体类中的属性名和字段名不一致的情况，会出现什么问题呢？
+
+- 情况1
+
+  若实体类中的属性使用的是驼峰命名风格，而表中的字段使用的是下划线命名风格
+  例如实体类属性userName，表中字段user_name
+  此时MyBatis-Plus会自动将下划线命名风格转化为驼峰命名风格
+  相当于在MyBatis中配置
+
+- 情况2
+  若实体类中的属性和表中的字段不满足情况1
+  例如实体类属性name，表中字段username
+  此时需要在实体类属性上使用@TableField("username")设置属性所对应的字段名
+
+
+
+## 4、@TableLogic
+
+逻辑删除
+
+增加一个字段用于表示是否删除
+
+```java
+@TableLogic
+private Interget isDeleted
+```
+
+测试
+
+删除：
+
+```sql
+UPDATE t_user SET is_deleted=1 WHERE id=? AND is_deleted=0
+```
+
+查询：
+
+```sql
+SELECT id,name,age,email,is_deleted FROM t_user WHERE id IN ( ? , ? ) AND is_deleted=0
+```
+
+
+
