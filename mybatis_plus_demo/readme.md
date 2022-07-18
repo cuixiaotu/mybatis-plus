@@ -208,7 +208,312 @@ mybatis-plus:
 
 
 
+# 三、基本的CRUD
+
+## 1、BaseMapper
+
+MyBatis-Plus中的基本CRUD在内置的BaseMapper中都已得到了实现，我们可以直接使用，接口如下：
+
+```java
+public interface BaseMapper<T> extends Mapper<T> {
+	
+   /**
+  	* 插入一条记录
+  	* @param entity 实体对象
+  	*/
+    int insert(T entity);
+
+    /**
+  	* 根据ID删除
+  	* @param id 主键ID
+  	*/
+    int deleteById(Serializable id);
+
+    /**
+  	* 根据ID删除
+  	* @param entity 实体对象
+  	*/
+    int deleteById(T entity);
+
+    /**
+  	* 根据columnMap条件删除
+  	* @param columnMap 表字段 map对象
+  	*/
+    int deleteByMap(@Param("cm") Map<String, Object> columnMap);
+
+    /**
+  	* 根据entity条件删除记录
+  	* @param queryWrapper实体对象封装操作类（可以为null，里面的entity用于生where语句）
+  	*/
+    int delete(@Param("ew") Wrapper<T> queryWrapper);
+
+    /**
+  	* 根据ID批量删除
+  	* @param idList 不能为null或empty
+  	*/
+    int deleteBatchIds(@Param("coll") Collection<?> idList);
+
+    /**
+  	* 根据ID修改
+  	* @param entity实体对象
+  	*/
+    int updateById(@Param("et") T entity);
+
+    /**
+  	 * 根据 whereEntity 条件，更新记录
+  	 * @param entity    实体对象 (set 条件值,可以为 null)
+  	 * @param updateWrapper 实体对象封装操作类（可以为 null,里面的 entity 用于生成
+where 语句）
+  	 */
+    int update(@Param("et") T entity, @Param("ew") Wrapper<T> updateWrapper);
+
+    /**
+  	* 根据 ID 查询
+  	* @param id 主键ID
+  	*/
+    T selectById(Serializable id);
+
+    /**
+  	* 查询（根据ID 批量查询）
+  	* @param idList 主键ID列表(不能为 null 以及 empty)
+  	*/
+    List<T> selectBatchIds(@Param("coll") Collection<? extends Serializable> idList);
+
+    /**
+  	* 查询（根据 columnMap 条件）
+  	* @param columnMap 表字段 map 对象
+  	*/
+    List<T> selectByMap(@Param("cm") Map<String, Object> columnMap);
+    
+	/**
+    * 根据 entity 条件，查询一条记录
+  	* 查询一条记录，例如 qw.last("limit 1") 限制取一条记录, 注意：多条数据会报异常
+  	* @param queryWrapper 实体对象封装操作类（可以为 null）
+  	*/
+    default T selectOne(@Param("ew") Wrapper<T> queryWrapper) {
+        List<T> ts = this.selectList(queryWrapper);
+        if (CollectionUtils.isNotEmpty(ts)) {
+            if (ts.size() != 1) {
+                throw ExceptionUtils.mpe("One record is expected, but the query result is multiple records", new Object[0]);
+            } else {
+                return ts.get(0);
+            }
+        } else {
+            return null;
+        }
+    }
+
+    /**
+    * 根据 Wrapper 条件，查询是否存在记录
+  	* @param queryWrapper 实体对象封装操作类（可以为 null）
+  	*/
+    default boolean exists(Wrapper<T> queryWrapper) {
+        Long count = this.selectCount(queryWrapper);
+        return null != count && count > 0L;
+    }
+
+    /**
+    * 根据 Wrapper 条件，查询总记录数
+  	* @param queryWrapper 实体对象封装操作类（可以为 null）
+  	*/
+    Long selectCount(@Param("ew") Wrapper<T> queryWrapper);
+
+    /**
+  	* 根据 entity 条件，查询全部记录
+  	* @param queryWrapper 实体对象封装操作类（可以为 null）
+  	*/
+    List<T> selectList(@Param("ew") Wrapper<T> queryWrapper);
+
+    /**
+  	* 根据 Wrapper 条件，查询全部记录
+  	* @param queryWrapper 实体对象封装操作类（可以为 null）
+  	*/
+    List<Map<String, Object>> selectMaps(@Param("ew") Wrapper<T> queryWrapper);
+
+    /**
+  	* 根据 Wrapper 条件，查询全部记录
+  	* <p>注意： 只返回第一个字段的值</p>
+  	* @param queryWrapper 实体对象封装操作类（可以为 null）
+  	*/
+    List<Object> selectObjs(@Param("ew") Wrapper<T> queryWrapper);
+
+    /**
+  	* 根据 entity 条件，查询全部记录（并翻页）
+  	* @param page     分页查询条件（可以为 RowBounds.DEFAULT）
+  	* @param queryWrapper 实体对象封装操作类（可以为 null）
+  	*/
+    <P extends IPage<T>> P selectPage(P page, @Param("ew") Wrapper<T> queryWrapper);
+
+    /**
+  	* 根据 Wrapper 条件，查询全部记录（并翻页）
+  	* @param page     分页查询条件
+  	* @param queryWrapper 实体对象封装操作类
+  	*/
+    <P extends IPage<Map<String, Object>>> P selectMapsPage(P page, @Param("ew") Wrapper<T> queryWrapper);
+}
+```
 
 
 
+## 2、插入
+
+```java
+    @Test
+    public void testInsert(){
+        User user = new User(null,"张三",18,"zhangsan@qq.com");
+        int result = userMapper.insert(user);
+        System.out.println("受影响的行数："+result );
+        System.out.println("id自动获取:"+user.getId());
+    }
+```
+
+> id自动获取:1548864157437214722。默认使用了雪花算法
+
+
+
+## 3、删除
+
+- 根据ID删除
+
+```java
+    @Test
+    public void testDeleteById(){
+        int result = userMapper.deleteById(1548864157437214722L);
+        System.out.println("受影响的行数："+result );
+    }
+```
+
+- 根据Ids删除
+
+```java
+    @Test
+    public void testDeleteByIds(){
+        List<Long> idList = Arrays.asList(1L,2L,3L);
+        int result = userMapper.deleteBatchIds(idList);
+        System.out.println("受影响的行数："+result );
+    }
+```
+
+- 根据map删除
+
+```java
+    @Test
+    public void testDeleteByMap(){
+        Map<String,Object> map = new HashMap<>();
+        map.put("age",18);
+        map.put("name","张三");
+        int result = userMapper.deleteByMap(map);
+        System.out.println("受影响的行数："+result );
+    }
+```
+
+
+
+## 4、修改
+
+```java
+    @Test
+    public void testUpdateById(){
+        User user = new User(4L,"admin",22,null);
+        int result = userMapper.updateById(user);
+        System.out.println(result);
+    }
+```
+
+
+
+## 5、查询
+
+- 根据ID查询
+
+```java
+@Test
+public void testSelectById(){
+    User user = userMapper.selectById(4L);
+    System.out.println(user);
+}
+```
+
+
+
+- 根据Ids查询
+
+```java
+@Test
+public void testSelectByIds(){
+    List<Long> idList = Arrays.asList(4L,5L);
+    List<User> userList = userMapper.selectBatchIds(idList);
+    System.out.println(userList);
+}
+```
+
+
+
+- 根据map查询
+
+```java
+@Test
+public void testSelectByMap(){
+    Map<String,Object> map = new HashMap<>();
+    map.put("age",22);
+    map.put("name","admin");
+    List<User> list = userMapper.selectByMap(map);
+    System.out.println(list);
+}
+```
+
+
+
+- 查询所有数据
+
+```java
+@Test
+public void testSelectList(){
+    userMapper.selectList(null).forEach(System.out::println);
+}
+```
+
+
+
+## 6、通用的Service
+
+> 说明
+>
+> - 通用的Service封装了IService接口，进一步封装CRUD采用`get 查询单行` `remove删除` `list查询集合` `page 分页`前缀命名方式区分Mapper层避免混淆
+> - 泛型`T`为任意实体对象
+> - 建议如果存在自定义通用Service方法的可能，请创建自己的`IBaseService`继承`Mybatis-Plus`提供的基类
+> - 官网地址：https://baomidou.com/pages/49cc81/#service-crud-%E6%8E%A5%E5%8F%A3
+
+- IService 
+
+MyBatis-Plus中有一个接口IService和其实现类ServiceImpl，封装了常见的业务层逻辑
+
+- 创建Service接口
+
+```java
+//UserService继承IService的基本模板
+public interface UserService extend IService<User>{
+
+}
+```
+
+- 实现类
+
+```java
+package com.xiaotu.mybatisplus.service.impl;
+
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.xiaotu.mybatisplus.mapper.UserMapper;
+import com.xiaotu.mybatisplus.poji.User;
+import com.xiaotu.mybatisplus.service.UserService;
+import org.springframework.stereotype.Service;
+/**
+* ServiceImpl实现了IService，提供了IService中基础功能的实现
+* 若ServiceImpl无法满足业务需求，则可以使用自定的UserService定义方法，并在实现类中实现
+*/
+@Service
+public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
+}
+
+```
 
