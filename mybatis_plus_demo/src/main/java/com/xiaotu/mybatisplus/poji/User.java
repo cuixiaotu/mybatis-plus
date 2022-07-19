@@ -1,6 +1,7 @@
 package com.xiaotu.mybatisplus.poji;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.xiaotu.mybatisplus.enums.SexEnum;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -18,6 +19,7 @@ public class User {
     private Integer age;
     private String email;
 
+    private SexEnum sex;
     @TableLogic
     private Integer isDeleted;
 
