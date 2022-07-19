@@ -645,3 +645,811 @@ SELECT id,name,age,email,is_deleted FROM t_user WHERE id IN ( ? , ? ) AND is_del
 
 
 
+
+
+# 五、条件构建器和常用接口
+
+## 1、wapper介绍
+
+![image-20220718152651968](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20220718152651968.png)
+
+- Wrapper ： 条件构造抽象类，最顶端父类
+  - AbstractWrapper ： 用于查询条件封装，生成 sql 的 where 条件
+    - QueryWrapper ： 查询条件封装
+    - UpdateWrapper ： Update 条件封装
+    - AbstractLambdaWrapper ： 使用Lambda 语法
+      - LambdaQueryWrapper ：用于Lambda语法使用的查询Wrapper
+      - LambdaUpdateWrapper ： Lambda 更新封装Wrapper
+
+
+
+## 2、QueryWapper
+
+- 组装查询条件
+
+```java
+    @Test
+    public void test01(){
+        //查询用户名包含a,年龄在20至30岁之前，并且邮箱不为null的用户信息
+        //select id,username as name,age,email,is_deleted from t_user where
+        // is_deleted=0 and (username like ? and age between ? and ? and email is not null )
+
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.like("username","a")
+                .between("age",20,30)
+                .isNotNull("email");
+        List<User> list = userMapper.selectList(queryWrapper);
+        list.forEach(System.out::println);
+    }
+```
+
+
+
+- 组装排序条件
+
+```java
+    @Test
+    public void test02(){
+        //按年龄降序查询用户，如果年龄相同则按id升序排列
+        //select id,username as name,age,email,is_deleted from t_user  where is_deleted=0  order by age desc ,id asc
+
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.orderByDesc("age").orderByAsc("id");
+        List<User> list = userMapper.selectList(queryWrapper);
+        list.forEach(System.out::println);
+    }
+```
+
+
+
+- 组装删除条件
+
+```java
+    @Test
+    public void test03(){
+        //删除email为空的用户
+        //DELETE FROM t_user WHERE (email IS NULL)
+
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.isNull("email");
+        int result  = userMapper.delete(queryWrapper);
+        System.out.println("受影响的行数：" + result);
+    }
+```
+
+
+
+- 条件的优先级
+
+```java
+    @Test
+    public void test03(){
+        //删除email为空的用户
+        //DELETE FROM t_user WHERE (email IS NULL)
+
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.isNull("email");
+        int    @Test
+    public void test04(){
+        //将（年龄大于20并且用户名中包含有a）或邮箱为null的用户信息修改
+        //UPDATE t_user SET age=?, email=? WHERE (username LIKE ? AND age > ? OR email IS NULL)
+
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.like("username","a")
+                .gt("age",20)
+                .or()
+                .isNull("email");
+        User user = new User();
+        user.setAge(18);
+        user.setEmail("cuixiaotu@gmail.com");
+        int result = userMapper.update(user,queryWrapper);
+        System.out.println("受影响的行数：" + result);
+    }tem.out.println("受影响的行数：" + result);
+    }
+```
+
+
+
+```java
+    @Test
+    public void test04b(){
+        //将用户名中包含有a（年龄大于20或或邮箱为null）的用户信息修改
+        //UPDATE t_user SET age=?, email=? WHERE (username LIKE ? AND (age > ? OR email IS NULL))
+
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.like("username","a")
+                .and(i->i.gt("age",20).or().isNull("email"));
+
+        User user = new User();
+        user.setAge(18);
+        user.setEmail("cuixiaotub@gmail.com");
+        int result = userMapper.update(user,queryWrapper);
+        System.out.println("受影响的行数：" + result);
+    }
+
+```
+
+
+
+
+
+- 组装select子句
+
+```java
+    @Test
+    public void test05(){
+        //查询用户信息的username和age字段
+        //SELECT username,age FROM t_user
+
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.select("username","age");
+        //selectMaps()返回Map集合列表，通常配合select()使用，避免User对象中没有被查询到的列值为null
+        List<Map<String,Object>> map = userMapper.selectMaps(queryWrapper);
+        map.forEach(System.out::println);
+    }
+```
+
+
+
+- 组装子查询
+
+```java
+    @Test
+    public void test06(){
+        //查询id小于等于3的用户信息
+        //SELECT id,username AS name,age,email,is_deleted FROM t_user WHERE (id IN (select id from t_user where id <= 3))
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.inSql("id","select id from t_user where id < 30");
+        List<User> list = userMapper.selectList(queryWrapper);
+        list.forEach(System.out::println);
+    }
+```
+
+
+
+## 3、UpdateWrapper
+
+- 组装删除条件
+
+```java
+    @Test
+    public void test07(){
+        //将（年龄大于20或邮箱为null）并且用户名中包含有a的用户信息修改
+        //组装set子句以及修改条件
+        UpdateWrapper<User> updateWrapper = new UpdateWrapper<>();
+        updateWrapper.set("age",18)
+                .set("email","cuixinpk@gmail.com")
+                .like("username","a")
+                .and(i->i.gt("age",20).or().isNull("email"));
+        //这里必须要创建User对象，否则无法应用自动填充。如果没有自动填充，可以设置为null
+        //UPDATE t_user SET username=?, age=?,email=? WHERE (username LIKE ? AND (age > ? OR email IS NULL))
+        //User user = new User();
+        //user.setName("张三");
+        //int result = userMapper.update(user, updateWrapper);
+        //UPDATE t_user SET age=?,email=? WHERE (username LIKE ? AND (age > ? OR email IS NULL))
+
+        int result = userMapper.update(null,updateWrapper);
+        System.out.println(result);
+    }
+```
+
+
+
+## 4、condition
+
+> 在真正开发的过程中，组装条件是常见的功能，而这些条件数据来源于用户输入，是可选的，因
+> 此我们在组装这些条件时，必须先判断用户是否选择了这些条件，若选择则需要组装该条件，若
+> 没有选择则一定不能组装，以免影响SQL执行的结果
+
+思路一：
+
+```java
+	@Test
+    public void test08(){
+        String username = null;
+        Integer ageBegin = 10;
+        Integer ageEnd = 24;
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        //StringUtils.isNotBlank()判断某字符串是否不为空且长度不为0且不由空白符(whitespace)构成
+        if (StringUtils.isNotBlank(username)){
+            queryWrapper.like("username","a");
+        }
+        if (ageBegin != null){
+            queryWrapper.ge("age",ageBegin);
+        }
+        if (ageEnd != null){
+            queryWrapper.le("age",ageEnd);
+        }
+        //SELECT id,username AS name,age,email,is_deleted FROM t_user WHERE (age >=? AND age <= ?)
+        List<User> users = userMapper.selectList(queryWrapper);
+        users.forEach(System.out::println);
+    }
+```
+
+
+
+思路二：
+
+```java
+    @Test
+    public void test08UseCondition(){
+        //定义查询条件，有可能为null（用户未输入或未选择）
+        String username = null;
+        Integer ageBegin = 10;
+        Integer ageEnd = 24;
+
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.like(StringUtils.isNotBlank(username),"username","a")
+                .ge(ageBegin!=null,"age",ageBegin)
+                .le(ageEnd!=null,"age",ageEnd);
+
+        List<User> users = userMapper.selectList(queryWrapper);
+        users.forEach(System.out::println);
+    }
+```
+
+
+
+## 5、LambdaQueryWrapper
+
+```java
+    @Test
+    public void test09(){
+        //定义查询条件，有可能为null（用户未输入）
+        String username = "i";
+        Integer ageBegin = 10;
+        Integer ageEnd = 24;
+        LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
+        //避免使用字符串标识字符，防止运行时错误
+        queryWrapper.like(StringUtils.isNotBlank(username),User::getName,username)
+                .ge(ageBegin != null, User::getAge, ageBegin)
+                .ge( ageEnd != null, User::getAge, ageEnd);
+        List<User> users = userMapper.selectList(queryWrapper);
+        users.forEach(System.out::println);
+    }
+```
+
+
+
+## 6、LambdaUpdateWrapper
+
+```java
+    @Test
+    public void test10(){
+        LambdaUpdateWrapper<User>  updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.set(User::getAge,18)
+                .set(User::getEmail,"cuixinpk@gmail.com")
+                .like(User::getName,"i")
+                .and( i->i.lt(User::getAge,24).or().isNull(User::getEmail));
+        User user = new User();
+        int result = userMapper.update(user,updateWrapper);
+        System.out.println("受影响的行数：" + result);
+    }
+```
+
+
+
+# 六、插件
+
+## 1、分页插件
+
+- 添加配置类
+
+```java
+@Configuration
+@MapperScan("com.xiaotu.mybatisplus.mapper")
+public class MyBatisPlusConfig {
+
+    @Bean
+    public MybatisPlusInterceptor mybatisPlusInterceptor(){
+        MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
+        interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.MYSQL));
+        return interceptor;
+    }
+}
+```
+
+
+
+- 测试
+
+```java
+	@Test
+    public void testPage(){
+        //设置分页参数
+        Page<User> page = new Page<>(1,5);
+        userMapper.selectPage(page,null);
+        //获取分页数据
+        List<User> list = page.getRecords();
+        list.forEach(System.out::println);
+        System.out.println("当前页："+page.getCurrent());
+        System.out.println("每页显示的条数："+page.getSize());
+        System.out.println("总记录数："+page.getTotal());
+
+        System.out.println("总页数："+page.getPages());
+        System.out.println("是否有上一页："+page.hasPrevious());
+        System.out.println("是否有下一页："+page.hasNext());
+    }
+```
+
+
+
+## 2、xml自定义分页
+
+- UserMapper中定义接口方法
+
+```java
+  /*
+    * 根据年龄查询用户列表，分页显示
+    * @param page 分页对象，xml中可以从里面进行取值，传递参数page即自动分页，必须放在第一位
+    * @param age 年纪
+    * @return
+    * */
+    Page<User> selectPageVo(@Param("page") Page<User> page, @Param("age") Integer age);
+```
+
+- UserMapper.xml中SQL
+
+```xml-dtd
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//com.xiaotu.mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xiaotu.mybatisplus.mapper.UserMapper">
+    <sql id="BaseColumns">id,username,age,email</sql>
+
+    <!--  Page<User> selectPageV0(@Param("page") Page<User> page,@Param("age") Integer age);-->
+    <select id="selectPageVo" resultType="com.xiaotu.mybatisplus.poji.User">
+        select <include refid="BaseColumns"></include> from t_user where age > #{age}
+    </select>
+
+</mapper>
+```
+
+- 测试
+
+```java
+    @Test
+    public void testSelectPageVo(){
+        //设置分页参数
+        Page<User> page = new Page<>(1,5);
+        userMapper.selectPageVo(page,10);
+        //获取分页数据
+        List<User> list = page.getRecords();
+        list.forEach(System.out::println);
+        System.out.println("当前页："+page.getCurrent());
+        System.out.println("每页显示的条数："+page.getSize());
+        System.out.println("总记录数："+page.getTotal());
+
+        System.out.println("总页数："+page.getPages());
+        System.out.println("是否有上一页："+page.hasPrevious());
+        System.out.println("是否有下一页："+page.hasNext());
+    }
+```
+
+
+
+## 3、乐观锁
+
+- 场景
+
+> 一件商品，成本价是80元，售价是100元。老板先是通知小李，说你去把商品价格增加50元。小
+> 李正在玩游戏，耽搁了一个小时。正好一个小时后，老板觉得商品价格增加到150元，价格太
+> 高，可能会影响销量。又通知小王，你把商品价格降低30元。
+> 此时，小李和小王同时操作商品后台系统。小李操作的时候，系统先取出商品价格100元；小王
+> 也在操作，取出的商品价格也是100元。小李将价格加了50元，并将100+50=150元存入了数据
+> 库；小王将商品减了30元，并将100-30=70元存入了数据库。是的，如果没有锁，小李的操作就
+> 完全被小王的覆盖了。
+> 现在商品价格是70元，比成本价低10元。几分钟后，这个商品很快出售了1千多件商品，老板亏1
+> 万多.
+
+- 乐观锁和悲观锁
+
+> 上面的故事，如果是乐观锁，小王保存价格前，会检查下价格是否被人修改过了。如果被修改过
+> 了，则重新取出的被修改后的价格，150元，这样他会将120元存入数据库。
+> 如果是悲观锁，小李取出数据后，小王只能等小李操作完之后，才能对价格进行操作，也会保证
+> 最终的价格是120元。
+
+- 模拟修改冲突
+
+```sql
+CREATE TABLE `mybatis_plus`.`t_product`  (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `name` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '商品名称',
+  `price` int(11) NULL DEFAULT 0 COMMENT '价格',
+  `version` int(11) NULL DEFAULT 0 COMMENT '乐观锁版本号',
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE = MyISAM AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+```
+
+- 添加数据
+
+```sql
+insert into t_product (id,name,price) VALUES (1, '外星人笔记本', 100);
+```
+
+- 添加实体
+
+```java
+@Data
+public class Product {
+    private long id;
+    private String name;
+    private Integer price;
+    private Integer version;
+}
+```
+
+- 添加Mapper
+
+```java
+public interface ProductMapper extends BaseMapper<Product> {
+}
+```
+
+- 测试
+
+```java
+    @Test
+    public void testConcurrentUpdate() {
+        //1、小李
+        Product p1 = productMapper.selectById(1L);
+        System.out.println("小李取出的价格：" + p1.getPrice());
+        //2、小王
+        Product p2 = productMapper.selectById(1L);
+        System.out.println("小王取出的价格：" + p2.getPrice());
+        //3、小李将价格加了50元，存入了数据库
+        p1.setPrice(p1.getPrice() + 50);
+        int result1 = productMapper.updateById(p1);
+        System.out.println("小李修改结果：" + result1);
+        //4、小王将商品减了30元，存入了数据库
+        p2.setPrice(p2.getPrice() - 30);
+        int result2 = productMapper.updateById(p2);
+        System.out.println("小王修改结果：" + result2);
+        //最后的结果
+        Product p3 = productMapper.selectById(1L);
+        //价格覆盖，最后的结果：70
+        System.out.println("最后的结果：" + p3.getPrice());
+    }
+```
+
+- 乐观锁实现逻辑
+
+> 数据库中添加version字段
+> 取出记录时，获取当前version
+>
+> ```sql
+> SELECT id,`name`,price,`version` FROM product WHERE id=1
+> ```
+>
+> 更新时，version + 1，如果where语句中的version版本不对，则更新失败
+>
+> ```sql
+> UPDATE product SET price=price+50, `version`=`version` + 1 WHERE id=1 AND
+> `version`=1
+> ```
+
+- Mybatis-Plus乐观锁
+
+  修改实体类  增加注解
+
+  ```sql
+  import com.baomidou.mybatisplus.annotation.Version;
+  import lombok.Data;
+  
+  @Data
+  public class Product {
+      private long id;
+      private String name;
+      private Integer price;
+      @Version
+      private Integer version;
+  }
+  ```
+
+- 添加乐观锁插件
+
+```mysql
+interceptor.addInnerInterceptor(new OptimisticLockerInnerInterceptor());
+```
+
+- 测试
+
+```java
+    @Test
+    public void testConcurrentVersionUpdate() {
+        //小李取数据
+        Product p1 = productMapper.selectById(1L);
+        //小王取数据
+        Product p2 = productMapper.selectById(1L);
+        //小李修改 + 50
+        p1.setPrice(p1.getPrice() + 50);
+        int result1 = productMapper.updateById(p1);
+        System.out.println("小李修改的结果：" + result1);
+        //小王修改 - 30
+        p2.setPrice(p2.getPrice() - 30);
+        int result2 = productMapper.updateById(p2);
+        System.out.println("小王修改的结果：" + result2);
+        if(result2 == 0){
+        //失败重试，重新获取version并更新
+        p2 = productMapper.selectById(1L);
+        p2.setPrice(p2.getPrice() - 30);
+        result2 = productMapper.updateById(p2);
+        }
+        System.out.println("小王修改重试的结果：" + result2);
+        //老板看价格
+        Product p3 = productMapper.selectById(1L);
+        System.out.println("老板看价格：" + p3.getPrice());
+    }
+```
+
+
+
+# 七、通用枚举
+
+> 表中有些字段值是固定的，例如性别（男或女），此时我们可以使用MyBatis-Plus的通用枚举来实现
+
+- 数据库增加字段sex
+
+- 创建通用枚举类型
+
+  ```java
+  package com.xiaotu.mybatisplus.enums;
+  
+  import com.baomidou.mybatisplus.annotation.EnumValue;
+  import lombok.Getter;
+  
+  @Getter
+  public enum  SexEnum {
+  
+      MALE(1,"男"),
+      FEMALE(2,"女");
+  
+      @EnumValue
+      private Integer sex;
+      private String sexName;
+  
+      SexEnum(Integer sex,String sexName) {
+          this.sex = sex;
+          this.sexName = sexName;
+      }
+  }
+  ```
+
+- 配置扫描通用枚举
+
+  ```yaml
+  mybatis-plus:
+  configuration:
+    # 配置MyBatis日志
+   log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+   db-config:
+     # 配置MyBatis-Plus操作表的默认前缀
+    table-prefix: t_
+     # 配置MyBatis-Plus的主键策略
+    id-type: auto
+   # 配置扫描通用枚举
+  type-enumsc-package: com.atguigu.mybatisplus.enums
+  ```
+
+- 测试
+
+  ```java
+  @SpringBootTest
+  public class MyBatisPlusEnumsTest {
+  
+      @Autowired
+      UserMapper userMapper;
+  
+      @Test
+      public void testSexEnum(){
+          User user = new User();
+          user.setName("Enum");
+          user.setAge(20);
+          user.setSex(SexEnum.MALE);
+          user.setEmail("et@qq.com");
+          userMapper.insert(user);
+      }
+  }
+  ```
+
+  
+
+# 八、代码生成器
+
+## 1、引入依赖
+
+```xml
+<dependency>
+	<groupId>com.baomidou</groupId>
+	<artifactId>mybatis-plus-generator</artifactId>
+	<version>3.5.1</version>
+</dependency>
+<dependency>
+	<groupId>org.freemarker</groupId>
+	<artifactId>freemarker</artifactId>
+	<version>2.3.29</version>
+</dependency>
+```
+
+
+
+## 2、快速生成
+
+```java
+@SpringBootTest
+public class FastAutoGeneratorTest {
+
+    public static void main(String[] args) {
+        FastAutoGenerator.create("jdbc:mysql://127.0.0.1:3306/mybatis_plus?characterEncoding=utf-8&userSSL=false", "root", "root")
+                .globalConfig(builder -> {
+                    builder.author("xiaotu") // 设置作者
+                            //.enableSwagger() // 开启 swagger 模式
+                            .fileOverride() // 覆盖已生成文件
+                            .outputDir("D://mybatis_plus"); // 指定输出目录
+                })
+                .packageConfig(builder -> {
+                    builder.parent("com.xiaotu") // 设置父包名
+                            .moduleName("mybatisplus") // 设置父包模块名
+                            .pathInfo(Collections.singletonMap(OutputFile.mapperXml, "D://mybatis_plus")); // 设置mapperXml生成路径
+                })
+                .strategyConfig(builder -> {
+                    builder.addInclude("t_user") // 设置需要生成的表名
+                            .addTablePrefix("t_", "c_"); // 设置过滤表前缀
+                })
+                .templateEngine(new FreemarkerTemplateEngine()) // 使用Freemarker引擎模板，默认的是Velocity引擎模板
+                .execute();
+    }
+}
+```
+
+
+
+# 九、多数据源
+
+> 适用于多种场景：纯粹多库、 读写分离、 一主多从、 混合模式等
+> 目前我们就来模拟一个纯粹多库的一个场景，其他场景类似
+> 场景说明：
+> 我们创建两个库，分别为：mybatis_plus（以前的库不动）与mybatis_plus_1（新建），将
+> mybatis_plus库的product表移动到mybatis_plus_1库，这样每个库一张表，通过一个测试用例
+> 分别获取用户数据与商品数据，如果获取到说明多库模拟成功
+
+
+
+## 1、创建数据库及表
+
+```sql
+CREATE DATABASE `mybatis_plus_1` /*!40100 DEFAULT CHARACTER SET utf8mb4 */;
+use `mybatis_plus_1`;
+CREATE TABLE product
+(
+`id` BIGINT(20) NOT NULL COMMENT '主键ID',
+`name` VARCHAR(30) NULL DEFAULT NULL COMMENT '商品名称',
+`price` INT(11) DEFAULT 0 COMMENT '价格',
+`version` INT(11) DEFAULT 0 COMMENT '乐观锁版本号',
+PRIMARY KEY (`id`)
+)
+```
+
+> 添加测试数据
+
+```sql
+INSERT INTO product (id, NAME, price) VALUES (1, '外星人笔记本', 100);
+```
+
+> 删除mybatis_plus库product表
+
+```
+use mybatis_plus;
+DROP TABLE IF EXISTS product
+```
+
+## 2、引入依赖
+
+```xml
+<dependency>
+	<groupId>com.baomidou</groupId>
+	<artifactId>dynamic-datasource-spring-boot-starter</artifactId>
+	<version>3.5.0</version>
+</dependency>
+```
+
+
+
+## 3、配置多数据源
+
+```yaml
+spring:
+  # 配置数据源信息
+  datasource:
+    dynamic:
+      # 设置默认的数据源或者数据源组,默认值即为master
+      primary: master
+      # 严格匹配数据源,默认false.true未匹配到指定数据源时抛异常,false使用默认数据源
+      strict: false
+      datasource:
+        master:
+          url: jdbc:mysql://localhost:3306/mybatis_plus?characterEncoding=utf-8&useSSL=false
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          username: root
+          password: root
+        slave_1:
+          url: jdbc:mysql://localhost:3306/mybatis_plus_1?characterEncoding=utf-8&useSSL=false
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          username: root
+          password: root
+
+```
+
+## 4、创建用户service
+
+```java
+public interface UserService extends IService<User> {
+}
+```
+
+
+
+```java
+@DS("master") //指定所操作的数据源
+@Service
+public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements
+UserService {
+}
+```
+
+
+
+## 5、创建用户service
+
+```java
+public interface ProductService extends IService<Product> {
+}
+```
+
+
+
+```java
+@DS("slave_1")
+@Service
+public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product>
+implements ProductService {
+}
+```
+
+
+
+## 6、测试
+
+```java
+@Autowired
+private UserService userService;
+@Autowired
+private ProductService productService;
+@Test
+public void testDynamicDataSource(){
+  System.out.println(userService.getById(1L));
+  System.out.println(productService.getById(1L));
+}
+```
+
+>结果：
+>1、都能顺利获取对象，则测试成功
+>2、如果我们实现读写分离，将写操作方法加上主库数据源，读操作方法加上从库数据源，自动切
+>换，是不是就能实现读写分离？
+
+
+
+
+
+# 十、MyBatisX插件
+
+> MyBatis-Plus为我们提供了强大的mapper和service模板，能够大大的提高开发效率
+> 但是在真正开发过程中，MyBatis-Plus并不能为我们解决所有问题，例如一些复杂的SQL，多表
+> 联查，我们就需要自己去编写代码和SQL语句，我们该如何快速的解决这个问题呢，这个时候可
+> 以使用MyBatisX插件
+> MyBatisX一款基于 IDEA 的快速开发插件，为效率而生
+
+MyBatisX插件用法：https://baomidou.com/pages/ba5b24/
+
