@@ -6,7 +6,7 @@
     <sql id="BaseColumns">id,username,age,email</sql>
 
     <!--  Page<User> selectPageV0(@Param("page") Page<User> page,@Param("age") Integer age);-->
-    <select id="selectPageVo" resultType="User">
+    <select id="selectPageVo" resultType="com.xiaotu.mybatisplus.poji.User">
         select <include refid="BaseColumns"></include> from t_user where age > #{age}
     </select>
 
